@@ -1,0 +1,98 @@
+#!/bin/bash
+# Author: Andi Frank
+# Purpose: Instead of deleting file, move to ~/.Trash directory as backup. To prevent horrible
+# rm -rf tragedies. Vanilla rm can be called with \rm.
+# NOTE: NOT THE SAME AS Trash-cli .Trash directiory
+#
+# TODO: Make Trash emptying automatic after a certain amount of time so as not to waste storage.
+
+function fmt_str() { printf '%s1b[%sm' '\x' $1; }
+gray=$(fmt_str 90)
+red=$(fmt_str 31)
+yellow=$(fmt_str 33)
+
+bold=$(fmt_str 1)
+ul=$(fmt_str 4)
+inverted=$(fmt_str 7)
+
+endbold=$(fmt_str 21)
+endul=$(fmt_str 24)
+endinv=$(fmt_str 27) 
+endfmt=$(fmt_str 0) 
+##########################################################################################
+##                                  SETUP
+##########################################################################################
+
+
+homedir=$HOME
+trashdir=$homedir$"/.Trash/"
+backupdir=$trashdir$"backup/"
+
+# Make trash directory if it doesn"t exist 
+mkdir $trashdir &> /dev/null
+# Make backup directory if it doesn"t exist
+mkdir $backupdir &> /dev/null
+
+# Remind user that they're using 'saferm', not standard 'rm'
+printf "%b%bsaferm:%b File moved to %b. Base rm can be called with %s.%b\n" $gray $bold $endbold $trashdir '\rm' $endfmt;
+
+# Check that argument exists and that it is a file or directory
+filepath=$(realpath $1)
+if [ ! -d $filepath ]  && [ ! -f $filepath ]; then
+    printf "%b%bsaferm:%b Error: cannot remove \'%s\', no such file or directory.%b\n" $red $bold $endbold $1 $endfmt
+    exit -1
+fi
+
+
+
+
+##########################################################################################
+##                              FILE-MOVING FUNCTIONS
+##########################################################################################
+
+# Attempt to move directory to ~/.Trash
+move_to_trash()
+{
+	while [ ! -z "$1" ]; do	
+            mv $(realpath $1) $trashdir
+        	shift #increment loop var
+	done
+}
+
+
+
+# Handle case where ~/.Trash/dir already exists
+save_last_trashed() {
+    path=$(realpath $1)
+	name=$trashdir$1
+	oldname=$backupdir$1
+
+    # Get string descriptor of if argument is file or directory.
+    if [ -d $path ]; then
+        filetype="directory"
+    elif [ -f $path ]; then
+        filetype="file"
+    else
+        printf $"%b%bsaferm:%b Error in function save_last_trashed \'%b\': no such file or directory.\n%b" $red $bold $endbold $1 $endfmt
+        exit -1
+    fi
+
+    # If there is already a backup version of this dir, overwrite it with newer backup version
+	if [ -e $name ]; then 
+		printf "%b%bsaferm:%b Warning, %b %b already exists in trash. Previously trashed version backed up as \'%b\'.%b\n" $yellow $bold $endbold $filetype $1 $oldname $endfmt
+        if [ -e $oldname ]; then
+			# delete old, old file
+            rm -rf $oldname
+		fi
+
+		# Rename old file to oldname
+		mv $name $oldname
+	fi	
+}
+
+##########################################################################################
+##                                      MAIN
+##########################################################################################
+# Call functions and do the moving
+save_last_trashed $1
+move_to_trash $1
